@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ทดสอบฟังก์ชัน verify()</title>
+<style>
+body{margin:0;background:#0f172a;color:#e2e8f0;font-family:"Sarabun",-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px}
+h1{font-size:22px;margin:0 0 4px}
+#sum{font-size:20px;font-weight:bold;padding:12px;border-radius:10px;margin:12px 0}
+.pass{background:#052e16;color:#4ade80;border-left:10px solid #22c55e}
+.fail{background:#450a0a;color:#fca5a5;border-left:10px solid #ef4444}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:8px 10px;border-bottom:1px solid #334155;text-align:left;vertical-align:top}
+th{color:#94a3b8;font-weight:normal}
+tr.ok td:first-child{color:#4ade80;font-weight:bold}
+tr.no td:first-child{color:#fca5a5;font-weight:bold}
+tr.no{background:#2a0d0d}
+code{color:#93c5fd;word-break:break-all}
+</style>
+</head>
+<body>
+<h1>ทดสอบฟังก์ชัน verify()</h1>
+<div style="color:#94a3b8">ใช้ข้อมูลปลอมจาก mock-api.js เป็นฐานข้อมูลจำลอง</div>
+<div id="sum">กำลังรัน...</div>
+<table id="tb">
+  <tr><th>ผล</th><th>กรณีทดสอบ</th><th>QR</th><th>ต้องได้</th><th>ได้จริง</th></tr>
+</table>
+
+<script src="verify.js"></script>
+<script src="mock-api.js"></script>
+<script>
+'use strict';
+
+/* ใช้ข้อมูลตัวอย่างชุดเดียวกับในชีต แล้วเติมเครื่องที่ถูกระงับอีก 1 เครื่องไว้ทดสอบ */
+var REVOKED_DEV = {
+  device_id: 'D0009', emp_id: 'E00123', imei: '356789012345679', brand_model: 'Vivo Y36',
+  color: 'ฟ้า', permit_expiry: '2027-12-31', status: 'REVOKED', sig8: 'Rv0Kd9Zq'
+};
+
+var DB = PhoneCheck.buildDB({
+  employees: MockAPI._data.employees,
+  devices: MockAPI._data.devices.concat([REVOKED_DEV])
+});
+
+/* ตรึงเวลาไว้ที่ 1 มิ.ย. 2026 เพื่อให้ผลเทสคงที่ไม่ว่าจะรันวันไหน */
+var NOW = new Date('2026-06-01T09:00:00').getTime();
+
+var Q = MockAPI.demoQR;
+
+var CASES = [
+  { name: 'บัตรจริง ผ่านทุกข้อ', qr: Q.ok, want: 'OK' },
+  { name: 'sig ผิด (บัตรปลอม)', qr: 'E00123|D0001|AAAAAAAA', want: 'BAD_SIG' },
+  { name: 'ใบอนุญาตหมดอายุ', qr: Q.expired, want: 'EXPIRED' },
+  { name: 'เครื่องถูกระงับ (REVOKED)', qr: 'E00123|D0009|Rv0Kd9Zq', want: 'DEVICE_STATUS' },
+  { name: 'QR รูปแบบผิด (ไม่มีขีดคั่น)', qr: 'HELLO WORLD', want: 'FORMAT' },
+  { name: 'QR รูปแบบผิด (2 ส่วน)', qr: 'E00123|D0001', want: 'FORMAT' },
+  { name: 'QR ว่างเปล่า', qr: '', want: 'FORMAT' },
+  { name: 'พนักงานลาออก (RESIGNED)', qr: Q.resigned, want: 'EMP_STATUS' },
+  { name: 'ไม่มี device นี้ในระบบ', qr: 'E00999|D9999|ZZZZZZZZ', want: 'NO_DEVICE' },
+  { name: 'sig ถูกแต่สลับเจ้าของเครื่อง', qr: 'E00124|D0001|9fA3kZ0x', want: 'BAD_SIG' },
+  { name: 'มีช่องว่างหน้า-หลัง ต้องยังผ่าน', qr: '  ' + Q.ok + '  ', want: 'OK' },
+  { name: 'ยังไม่มีข้อมูลในเครื่อง', qr: Q.ok, db: null, want: 'NO_DB' }
+];
+</script>
+<script>
+'use strict';
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+var pass = 0, fail = 0, tb = document.getElementById('tb');
+
+for (var i = 0; i < CASES.length; i++) {
+  var c = CASES[i];
+  var db = (c.hasOwnProperty('db')) ? c.db : DB;
+  var got, gotMsg;
+  try {
+    var r = verify(c.qr, db, NOW);
+    got = r.code;
+    gotMsg = r.msg;
+    /* ผลลัพธ์ต้องสอดคล้องกัน: code OK เท่านั้นที่ ok = true */
+    if ((r.ok === true) !== (r.code === 'OK')) got = got + ' (ok flag ผิด)';
+  } catch (e) {
+    got = 'EXCEPTION';
+    gotMsg = String(e && e.message);
+  }
+
+  var good = (got === c.want);
+  if (good) pass++; else fail++;
+
+  var tr = document.createElement('tr');
+  tr.className = good ? 'ok' : 'no';
+  tr.innerHTML = '<td>' + (good ? 'ผ่าน' : 'ไม่ผ่าน') + '</td>'
+    + '<td>' + esc(c.name) + '</td>'
+    + '<td><code>' + esc(c.qr === '' ? '(ว่าง)' : c.qr) + '</code></td>'
+    + '<td>' + esc(c.want) + '</td>'
+    + '<td>' + esc(got) + '<div style="color:#94a3b8;font-size:13px">' + esc(gotMsg) + '</div></td>';
+  tb.appendChild(tr);
+}
+
+var sum = document.getElementById('sum');
+sum.className = fail === 0 ? 'pass' : 'fail';
+sum.textContent = (fail === 0 ? 'ผ่านทั้งหมด ' : 'มีข้อผิดพลาด ')
+  + pass + '/' + (pass + fail) + ' เคส' + (fail ? ' (ไม่ผ่าน ' + fail + ')' : '');
+</script>
+</body>
+</html>

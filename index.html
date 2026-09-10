@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>ตรวจมือถือ | Phone Check</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#0f172a;color:#e2e8f0;font-family:"Sarabun",-apple-system,"Segoe UI",Roboto,sans-serif;font-size:18px}
+.hide{display:none !important}
+#bar{position:fixed;top:0;left:0;right:0;height:52px;background:#1e293b;display:flex;align-items:center;
+     gap:10px;padding:0 12px;font-size:15px;z-index:50;border-bottom:1px solid #334155}
+#bar b{font-size:16px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+.on{background:#22c55e}.off{background:#ef4444}
+#pend{margin-left:auto;background:#334155;border-radius:14px;padding:4px 12px;font-size:15px}
+#pend.wait{background:#b45309;color:#fff}
+main{padding:64px 12px 12px}
+#login{max-width:420px;margin:8vh auto;text-align:center}
+#login h1{font-size:28px;margin:0 0 6px}
+#login p{color:#94a3b8;margin:0 0 24px}
+input{width:100%;padding:16px;font-size:22px;border-radius:12px;border:2px solid #334155;
+      background:#1e293b;color:#fff;margin-bottom:12px;text-align:center}
+button{font-family:inherit;cursor:pointer;border:0}
+.big{width:100%;padding:18px;font-size:22px;font-weight:bold;border-radius:12px;background:#2563eb;color:#fff}
+#err{color:#fca5a5;min-height:26px;margin-top:10px}
+#reader{width:100%;max-width:520px;margin:0 auto;border-radius:14px;overflow:hidden;background:#000}
+#reader video{width:100%!important;height:auto!important;display:block}
+#card{margin:12px auto;max-width:520px;border-radius:16px;padding:16px;background:#1e293b;border-left:12px solid #475569}
+#card.ok{background:#052e16;border-color:#22c55e}
+#card.no{background:#450a0a;border-color:#ef4444}
+#res{font-size:30px;font-weight:bold;margin-bottom:6px}
+#name{font-size:26px;font-weight:bold}
+.row{font-size:17px;color:#cbd5e1;margin-top:3px}
+#acts{display:flex;gap:12px;max-width:520px;margin:0 auto}
+#acts button{flex:1;padding:26px 0;font-size:28px;font-weight:bold;border-radius:16px;color:#fff}
+#bin{background:#16a34a}
+#bout{background:#dc2626}
+#acts button:disabled{background:#334155;color:#64748b}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0ea5e9;color:#fff;
+       padding:12px 20px;border-radius:10px;font-size:18px;z-index:99;opacity:0;transition:opacity .2s}
+#toast.show{opacity:1}
+.mini{background:#334155;color:#cbd5e1;padding:8px 14px;border-radius:10px;font-size:15px;margin-top:10px}
+#manual{max-width:520px;margin:10px auto}
+</style>
+</head>
+<body>
+
+<div id="bar" class="hide">
+  <b id="gname">-</b><span id="ggate" style="color:#94a3b8">-</span>
+  <span class="dot off" id="net"></span>
+  <span id="pend">รอส่ง 0</span>
+</div>
+
+<main>
+  <section id="login">
+    <h1>ระบบตรวจมือถือ</h1>
+    <p>เข้าสู่ระบบด้วยรหัสยาม + PIN</p>
+    <input id="gid" placeholder="รหัสยาม เช่น G01" autocomplete="off" autocapitalize="characters">
+    <input id="pin" placeholder="PIN 4 หลัก" inputmode="numeric" type="password" autocomplete="off">
+    <button class="big" id="btnLogin">เข้าสู่ระบบ</button>
+    <div id="err"></div>
+    <div id="mode"></div>
+    <button class="mini" id="btnCfg">ตั้งค่าเซิร์ฟเวอร์</button>
+    <div id="cfg" class="hide" style="margin-top:10px">
+      <input id="apiurl" placeholder="วาง URL ที่ลงท้ายด้วย /exec" style="font-size:15px">
+      <button class="big" id="btnSaveCfg">บันทึก URL</button>
+      <button class="mini" id="btnClearCfg">ล้างค่า กลับไปโหมดทดลอง</button>
+    </div>
+  </section>
+
+  <section id="scan" class="hide">
+    <div id="reader"></div>
+    <div id="card">
+      <div id="res">พร้อมสแกน</div>
+      <div id="name">หันกล้องไปที่บัตร QR</div>
+      <div class="row" id="d1"></div>
+      <div class="row" id="d2"></div>
+      <div class="row" id="d3"></div>
+    </div>
+    <div id="acts">
+      <button id="bin" disabled>เข้า</button>
+      <button id="bout" disabled>ออก</button>
+    </div>
+    <div id="manual">
+      <button class="mini" id="btnManual">พิมพ์รหัสเอง</button>
+      <button class="mini" id="btnSync">sync</button>
+      <button class="mini" id="btnOut">ออกจากระบบ</button>
+      <div id="mbox" class="hide" style="margin-top:8px">
+        <input id="mtext" placeholder="E00123|D0001|xxxxxxxx" autocomplete="off">
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script src="verify.js"></script>
+<script src="mock-api.js"></script>
+<script>
+/*** ⚠️ แก้ตรงนี้ ***/
+/* วาง URL ของ Web App ที่ได้จาก Apps Script (ลงท้ายด้วย /exec) */
+var API_URL = 'https://script.google.com/macros/s/AKfycbwJsaJ5JPBde8nLz9sDNv7XwLHj57XGVwH-uWefRN2T2ATZ8cfyd1SXifCiDqD6d8Ehmw/exec';
+
+/*** ⚠️ แก้ตรงนี้ ***/
+/* true  = ใช้ข้อมูลปลอมจาก mock-api.js (ทดสอบหน้าจอโดยยังไม่ต้อง deploy)
+   false = ยิงไปที่ API_URL จริง */
+var USE_MOCK = false;
+
+/* ถ้าเคยตั้งค่า URL ไว้ในหน้าจอแล้ว ให้ใช้ค่านั้นแทน และปิดโหมดทดลองอัตโนมัติ
+   (ตั้งครั้งเดียวต่อเครื่อง ไม่ต้องแก้ไฟล์นี้ก็ได้) */
+try {
+  var savedApi = localStorage.getItem('pc_api');
+  if (savedApi) { API_URL = JSON.parse(savedApi); USE_MOCK = false; }
+} catch (e) {}
+</script>
+<script>
+'use strict';
+var $ = function (id) { return document.getElementById(id); };
+
+var K_TOKEN = 'pc_token', K_GUARD = 'pc_guard', K_DB = 'pc_db', K_QUEUE = 'pc_queue';
+var S = { token: '', guard: null, db: null, queue: [], last: { t: '', ts: 0 }, cur: null, busy: false };
+
+function lsGet(k, def) {
+  try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch (e) { return def; }
+}
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+function uuid() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+  });
+}
+
+/* ทุกคำขอ network มี timeout 5 วินาที และไม่บล็อก UI */
+function withTimeout(p, ms) {
+  return new Promise(function (resolve, reject) {
+    var done = false;
+    var t = setTimeout(function () { if (!done) { done = true; reject(new Error('TIMEOUT')); } }, ms || 5000);
+    p.then(function (v) { if (!done) { done = true; clearTimeout(t); resolve(v); } },
+           function (e) { if (!done) { done = true; clearTimeout(t); reject(e); } });
+  });
+}
+
+function apiGet(params) {
+  if (USE_MOCK) return withTimeout(MockAPI.get(params), 5000);
+  var q = [];
+  for (var k in params) q.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
+  return withTimeout(fetch(API_URL + '?' + q.join('&')).then(function (r) { return r.json(); }), 5000);
+}
+
+function apiPost(body) {
+  if (USE_MOCK) return withTimeout(MockAPI.post(body), 5000);
+  /* ใช้ content-type text/plain เพื่อเลี่ยง preflight เพราะ Apps Script ไม่ตอบ OPTIONS */
+  return withTimeout(fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  }).then(function (r) { return r.json(); }), 5000);
+}
+
+/* Apps Script มีอาการ POST หลุดกลายเป็น GET เป็นบางครั้ง (redirect 302 แล้ว body หาย)
+   สังเกตได้จากคำตอบไม่มีฟิลด์ที่ควรมี เช่น login ต้องมี token / logs ต้องมี saved
+   กรณีนี้ให้ยิงซ้ำ — ปลอดภัยเพราะฝั่งเซิร์ฟเวอร์กันซ้ำด้วย log_id อยู่แล้ว */
+function apiPostSure(body, expectKey, tries) {
+  if (tries === undefined) tries = 3;
+  return apiPost(body).then(function (r) {
+    if (r && r.ok && r[expectKey] === undefined && tries > 1) {
+      return apiPostSure(body, expectKey, tries - 1);
+    }
+    return r;
+  });
+}
+
+function updateBar() {
+  $('net').className = 'dot ' + (navigator.onLine ? 'on' : 'off');
+  var n = S.queue.length;
+  $('pend').textContent = 'รอส่ง ' + n;
+  $('pend').className = n > 0 ? 'wait' : '';
+  if (S.guard) { $('gname').textContent = S.guard.name; $('ggate').textContent = S.guard.gate; }
+}
+
+function toast(msg, color) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.style.background = color || '#0ea5e9';
+  t.className = 'show';
+  setTimeout(function () { t.className = ''; }, 1800);
+}
+
+/* token = guard_id.expiry_ms.sig8 — เช็กวันหมดอายุได้ในเครื่อง */
+function tokenAlive(token) {
+  var p = String(token || '').split('.');
+  if (p.length !== 3) return false;
+  return Number(p[1]) > Date.now();
+}
+
+function logout(reason) {
+  S.token = '';
+  localStorage.removeItem(K_TOKEN);
+  stopScanner();
+  $('scan').className = 'hide';
+  $('bar').className = 'hide';
+  $('login').className = '';
+  $('err').textContent = reason || '';
+}
+</script>
+<script>
+'use strict';
+
+function doLogin() {
+  var gid = $('gid').value.trim().toUpperCase(), pin = $('pin').value.trim();
+  if (!gid || !pin) { $('err').textContent = 'กรอกรหัสยามและ PIN ให้ครบ'; return; }
+  $('err').textContent = 'กำลังเข้าสู่ระบบ...';
+  apiPostSure({ action: 'login', guard_id: gid, pin: pin }, 'token').then(function (r) {
+    if (!r.ok) { $('err').textContent = r.msg || 'เข้าสู่ระบบไม่สำเร็จ'; return; }
+    if (!r.token) { $('err').textContent = 'เซิร์ฟเวอร์ตอบไม่ครบ กดเข้าสู่ระบบอีกครั้ง'; return; }
+    S.token = r.token; S.guard = r.guard;
+    lsSet(K_TOKEN, r.token); lsSet(K_GUARD, r.guard);
+    saveDB(r);
+    $('pin').value = '';
+    $('err').textContent = '';
+    openScanner();
+  })['catch'](function (e) {
+    $('err').textContent = (e && e.message === 'TIMEOUT')
+      ? 'เครือข่ายช้าหรือไม่มีสัญญาณ ลองใหม่อีกครั้ง' : 'ต่อเซิร์ฟเวอร์ไม่ได้';
+  });
+}
+
+function saveDB(payload) {
+  var raw = { ts: payload.ts, employees: payload.employees, devices: payload.devices };
+  lsSet(K_DB, raw);
+  S.db = PhoneCheck.buildDB(raw);
+}
+
+/* sync: ตอน login + ทุก 5 นาที + ตอนกลับมา online */
+function syncNow(silent) {
+  if (!S.token) return;
+  if (!tokenAlive(S.token)) { logout('token หมดอายุ กรุณาเข้าสู่ระบบใหม่'); return; }
+  apiGet({ action: 'sync', token: S.token }).then(function (r) {
+    if (!r.ok) {
+      if (r.err === 'TOKEN') logout('token หมดอายุ กรุณาเข้าสู่ระบบใหม่');
+      return;
+    }
+    if (r.guard) { S.guard = r.guard; lsSet(K_GUARD, r.guard); }
+    saveDB(r);
+    updateBar();
+    if (!silent) toast('อัปเดตข้อมูลแล้ว');
+  })['catch'](function () { if (!silent) toast('sync ไม่สำเร็จ (ออฟไลน์)', '#b45309'); });
+}
+
+/* ส่ง log: ทันทีหลังติ๊ก + ทุก 30 วินาที + ตอนกลับมา online */
+function flushQueue() {
+  if (S.busy || !S.token || !S.queue.length || !navigator.onLine) return;
+  if (!tokenAlive(S.token)) { logout('token หมดอายุ กรุณาเข้าสู่ระบบใหม่'); return; }
+  S.busy = true;
+  var batch = S.queue.slice(0, 50);
+  apiPostSure({ action: 'logs', token: S.token, logs: batch }, 'saved').then(function (r) {
+    S.busy = false;
+    if (!r.ok) { if (r.err === 'TOKEN') logout('token หมดอายุ กรุณาเข้าสู่ระบบใหม่'); return; }
+    if (!r.saved) return;   // คำตอบไม่ครบ เก็บไว้ในคิวแล้วส่งใหม่รอบหน้า (เซิร์ฟเวอร์กันซ้ำอยู่แล้ว)
+    /* ลบเฉพาะรายการที่เซิร์ฟเวอร์ยืนยัน (saved = เพิ่งบันทึก, skipped = เคยบันทึกแล้ว) */
+    var done = {};
+    var okIds = (r.saved || []).concat(r.skipped || []);
+    for (var i = 0; i < okIds.length; i++) done[okIds[i]] = true;
+    S.queue = S.queue.filter(function (g) { return !done[g.log_id]; });
+    lsSet(K_QUEUE, S.queue);
+    updateBar();
+    // ยังเหลือในคิว (เกิน batch หรือเพิ่งติ๊กระหว่างส่ง) ให้ส่งต่อทันที ไม่ต้องรอรอบ 30 วิ
+    if (S.queue.length) setTimeout(flushQueue, 1000);
+  })['catch'](function () { S.busy = false; });
+}
+
+function setButtons(on) { $('bin').disabled = !on; $('bout').disabled = !on; }
+
+function tick(direction) {
+  if (!S.cur) return;
+  var g = {
+    log_id: uuid(),
+    ts: new Date().toISOString(),
+    emp_id: S.cur.emp_id || '',
+    device_id: S.cur.device_id || '',
+    direction: direction,
+    gate: S.guard ? S.guard.gate : '',
+    guard_id: S.guard ? S.guard.guard_id : '',
+    result: S.cur.code
+  };
+  S.queue.push(g);
+  lsSet(K_QUEUE, S.queue);
+  updateBar();
+  toast(direction === 'IN' ? 'บันทึก เข้า แล้ว' : 'บันทึก ออก แล้ว',
+        direction === 'IN' ? '#16a34a' : '#dc2626');
+  setButtons(false);
+  S.cur = null;
+  S.last = { t: '', ts: 0 };
+  flushQueue();
+}
+
+function showResult(r) {
+  $('card').className = r.ok ? 'ok' : 'no';
+  $('res').textContent = (r.ok ? '🟢 ผ่าน' : '🔴 ไม่ผ่าน') + ' - ' + r.msg;
+  var emp = r.emp, dev = r.dev;
+  $('name').textContent = emp ? emp.name : (r.emp_id || '-');
+  $('d1').textContent = emp ? ('ซัพ: ' + emp.supplier + '  ' + emp.emp_id) : '';
+  $('d2').textContent = dev ? (dev.brand_model + ' / ' + dev.color + '  ' + dev.device_id) : '';
+  $('d3').textContent = dev ? ('IMEI ' + dev.imei + '  หมดอายุ ' + dev.permit_expiry) : '';
+  /* สั่น: ผ่าน 1 จังหวะ ไม่ผ่าน 2 จังหวะ */
+  if (navigator.vibrate) navigator.vibrate(r.ok ? [140] : [90, 90, 90]);
+  S.cur = r;
+  setButtons(true);
+}
+
+/* อ่าน QR ได้ -> ตรวจในเครื่องล้วน ๆ จึงเด้งผลทันที ไม่รอ network */
+function onScan(text) {
+  var now = Date.now();
+  if (text === S.last.t && (now - S.last.ts) < 5000) return;
+  S.last = { t: text, ts: now };
+  showResult(verify(text, S.db, now));
+}
+</script>
+<script>
+'use strict';
+
+/* กล้องเปิดค้างตลอด ไม่มีปุ่มสแกน */
+var h5 = null;
+function startScanner() {
+  if (h5) return;
+  if (typeof Html5Qrcode === 'undefined') {
+    $('reader').innerHTML = '<div style="padding:20px;color:#fca5a5">'
+      + 'โหลดตัวอ่าน QR ไม่ได้ ใช้ปุ่ม พิมพ์รหัสเอง ไปก่อน</div>';
+    return;
+  }
+  h5 = new Html5Qrcode('reader', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] });
+  h5.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 250, height: 250 } },
+    onScan, function () {})['catch'](function () {
+      $('reader').innerHTML = '<div style="padding:20px;color:#fca5a5">'
+        + 'เปิดกล้องไม่ได้ ต้องเปิดผ่าน https และกดอนุญาตกล้อง</div>';
+      h5 = null;
+    });
+}
+function stopScanner() {
+  if (h5) { try { h5.stop(); } catch (e) {} h5 = null; }
+}
+
+function openScanner() {
+  $('login').className = 'hide';
+  $('scan').className = '';
+  $('bar').className = '';
+  updateBar();
+  startScanner();
+}
+
+/* บอกให้ชัดว่าตอนนี้ต่อกับข้อมูลจริงหรือข้อมูลปลอม */
+function showMode() {
+  var m = $('mode');
+  if (USE_MOCK) {
+    m.innerHTML = '<span style="color:#fbbf24">โหมดทดลอง ใช้ข้อมูลปลอม '
+      + '(ล็อกอิน G01 / PIN 1234)</span>';
+  } else {
+    m.innerHTML = '<span style="color:#4ade80">ต่อกับชีตจริงแล้ว</span>'
+      + '<div style="color:#64748b;font-size:13px;word-break:break-all">' + API_URL + '</div>';
+  }
+}
+
+(function init() {
+  S.token = lsGet(K_TOKEN, '');
+  S.guard = lsGet(K_GUARD, null);
+  S.queue = lsGet(K_QUEUE, []);
+  var raw = lsGet(K_DB, null);
+  if (raw) S.db = PhoneCheck.buildDB(raw);
+  updateBar();
+
+  $('btnLogin').onclick = doLogin;
+  $('pin').onkeydown = function (e) { if (e.key === 'Enter') doLogin(); };
+  $('bin').onclick = function () { tick('IN'); };
+  $('bout').onclick = function () { tick('OUT'); };
+  $('btnSync').onclick = function () { syncNow(false); };
+  $('btnOut').onclick = function () { logout(''); };
+  $('btnManual').onclick = function () {
+    $('mbox').className = $('mbox').className === 'hide' ? '' : 'hide';
+    if ($('mbox').className === '') $('mtext').focus();
+  };
+  $('mtext').onkeydown = function (e) {
+    if (e.key === 'Enter') { onScan($('mtext').value.trim()); $('mtext').value = ''; }
+  };
+
+  /* ตั้งค่า URL เซิร์ฟเวอร์จากในหน้าจอ เก็บลงเครื่อง ไม่ต้องแก้ไฟล์ */
+  showMode();
+  $('apiurl').value = USE_MOCK ? '' : API_URL;
+  $('btnCfg').onclick = function () {
+    $('cfg').className = $('cfg').className === 'hide' ? '' : 'hide';
+  };
+  $('btnSaveCfg').onclick = function () {
+    var u = $('apiurl').value.trim();
+    if (u.indexOf('http') !== 0) { $('err').textContent = 'URL ต้องขึ้นต้นด้วย https'; return; }
+    lsSet('pc_api', u);
+    localStorage.removeItem(K_TOKEN); localStorage.removeItem(K_DB);
+    location.reload();
+  };
+  $('btnClearCfg').onclick = function () {
+    localStorage.removeItem('pc_api');
+    localStorage.removeItem(K_TOKEN); localStorage.removeItem(K_DB);
+    location.reload();
+  };
+
+  window.addEventListener('online', function () { updateBar(); syncNow(true); flushQueue(); });
+  window.addEventListener('offline', updateBar);
+  setInterval(function () { syncNow(true); }, 5 * 60 * 1000);
+  setInterval(flushQueue, 30 * 1000);
+
+  /* มี token ที่ยังไม่หมดอายุ + มีข้อมูลในเครื่อง = เข้าหน้าสแกนได้เลย แม้ออฟไลน์ */
+  if (S.token && tokenAlive(S.token) && S.db) {
+    openScanner();
+    syncNow(true);
+    flushQueue();
+  }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')['catch'](function () {});
+  }
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"
+        onload="if (document.getElementById('scan').className !== 'hide') startScanner();"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "ระบบตรวจมือถือพนักงาน (Phone Check)",
+  "short_name": "ตรวจมือถือ",
+  "description": "สแกน QR บัตรมือถือพนักงาน ตรวจสิทธิ์และติ๊กเข้า-ออก ใช้งานได้ตอนออฟไลน์",
+  "lang": "th",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230f172a'/%3E%3Cg fill='%2322c55e'%3E%3Crect x='96' y='96' width='104' height='104' rx='16'/%3E%3Crect x='312' y='96' width='104' height='104' rx='16'/%3E%3Crect x='96' y='312' width='104' height='104' rx='16'/%3E%3Crect x='240' y='240' width='48' height='48'/%3E%3Crect x='312' y='312' width='48' height='48'/%3E%3Crect x='368' y='368' width='48' height='48'/%3E%3Crect x='312' y='424' width='48' height='24'/%3E%3C/g%3E%3Cg fill='%230f172a'%3E%3Crect x='128' y='128' width='40' height='40'/%3E%3Crect x='344' y='128' width='40' height='40'/%3E%3Crect x='128' y='344' width='40' height='40'/%3E%3C/g%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%230f172a'/%3E%3Cg fill='%2322c55e'%3E%3Crect x='136' y='136' width='88' height='88' rx='12'/%3E%3Crect x='288' y='136' width='88' height='88' rx='12'/%3E%3Crect x='136' y='288' width='88' height='88' rx='12'/%3E%3Crect x='288' y='288' width='88' height='88' rx='12'/%3E%3C/g%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

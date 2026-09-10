@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>พิมพ์บัตร QR มือถือพนักงาน</title>
+<style>
+body{margin:0;background:#e2e8f0;font-family:"Sarabun",-apple-system,"Segoe UI",Roboto,sans-serif}
+#tool{background:#0f172a;color:#e2e8f0;padding:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#tool input{padding:10px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#fff;width:150px}
+#tool button{padding:10px 18px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-size:16px;cursor:pointer}
+#msg{color:#fca5a5}
+.page{width:210mm;min-height:297mm;margin:10px auto;background:#fff;padding:8mm;box-sizing:border-box;
+      display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(4,1fr);gap:4mm}
+.card{border:1px dashed #94a3b8;border-radius:3mm;padding:4mm;display:flex;gap:4mm;align-items:center;
+      box-sizing:border-box;overflow:hidden;color:#0f172a}
+.card img{width:30mm;height:30mm;flex:0 0 30mm}   /* QR 3 ซม. > ขั้นต่ำ 2.5 ซม. */
+.info{font-size:11pt;line-height:1.35;min-width:0}
+.info .nm{font-size:14pt;font-weight:bold}
+.info .sp{color:#334155}
+.info .sm{font-size:10pt;color:#475569;word-break:break-all}
+.tag{display:inline-block;margin-top:1mm;padding:0.5mm 2mm;border-radius:2mm;background:#0f172a;color:#fff;font-size:9pt}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  body{background:#fff}
+  #tool{display:none}
+  .page{margin:0;box-shadow:none;page-break-after:always;width:210mm;height:297mm}
+  .card{border:1px dashed #cbd5e1}
+}
+</style>
+</head>
+<body>
+
+<div id="tool">
+  <b>พิมพ์บัตร QR</b>
+  <input id="gid" placeholder="รหัสยาม/แอดมิน G01" autocomplete="off">
+  <input id="pin" placeholder="PIN" type="password" autocomplete="off">
+  <button id="btnLoad">ดึงข้อมูล</button>
+  <button id="btnPrint">พิมพ์</button>
+  <span id="msg"></span>
+</div>
+
+<div id="out"></div>
+
+<script src="mock-api.js"></script>
+<script>
+/*** ⚠️ แก้ตรงนี้ ***/
+var API_URL = 'https://script.google.com/macros/s/AKfycbwJsaJ5JPBde8nLz9sDNv7XwLHj57XGVwH-uWefRN2T2ATZ8cfyd1SXifCiDqD6d8Ehmw/exec';
+
+/*** ⚠️ แก้ตรงนี้ ***/
+var USE_MOCK = false;
+
+/* ใช้ URL ที่ตั้งค่าไว้ในแอปยาม (index.html) ถ้ามี — ตั้งครั้งเดียวใช้ได้ทั้งสองหน้า */
+try {
+  var savedApi = localStorage.getItem('pc_api');
+  if (savedApi) { API_URL = JSON.parse(savedApi); USE_MOCK = false; }
+} catch (e) {}
+
+/* ขนาด QR ที่สั่งจาก quickchart (px) ยิ่งใหญ่ยิ่งคมตอนพิมพ์ */
+var QR_PX = 300;
+</script>
+<script>
+'use strict';
+var $ = function (id) { return document.getElementById(id); };
+
+function withTimeout(p, ms) {
+  return new Promise(function (resolve, reject) {
+    var done = false;
+    var t = setTimeout(function () { if (!done) { done = true; reject(new Error('TIMEOUT')); } }, ms || 5000);
+    p.then(function (v) { if (!done) { done = true; clearTimeout(t); resolve(v); } },
+           function (e) { if (!done) { done = true; clearTimeout(t); reject(e); } });
+  });
+}
+
+function post(body) {
+  if (USE_MOCK) return withTimeout(MockAPI.post(body), 5000);
+  return withTimeout(fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  }).then(function (r) { return r.json(); }), 5000);
+}
+
+/* Apps Script บางครั้ง POST หลุดเป็น GET ทำให้คำตอบไม่มีข้อมูล — ยิงซ้ำได้ ไม่มีผลข้างเคียง */
+function postSure(body, expectKey, tries) {
+  if (tries === undefined) tries = 3;
+  return post(body).then(function (r) {
+    if (r && r.ok && r[expectKey] === undefined && tries > 1) {
+      return postSure(body, expectKey, tries - 1);
+    }
+    return r;
+  });
+}
+
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/* บัตร 1 ใบ: QR + ชื่อ + ซัพ + รุ่น/สี + IMEI + วันหมดอายุ */
+function cardHTML(dev, emp) {
+  var qr = dev.emp_id + '|' + dev.device_id + '|' + dev.sig8;
+  var img = 'https://quickchart.io/qr?margin=1&size=' + QR_PX + '&text=' + encodeURIComponent(qr);
+  return '<div class="card">'
+    + '<img src="' + img + '" alt="QR">'
+    + '<div class="info">'
+    + '<div class="nm">' + esc(emp.name || dev.emp_id) + '</div>'
+    + '<div class="sp">' + esc(emp.supplier || '') + '</div>'
+    + '<div class="sm">' + esc(dev.brand_model) + ' / ' + esc(dev.color) + '</div>'
+    + '<div class="sm">IMEI ' + esc(dev.imei) + '</div>'
+    + '<div class="sm">หมดอายุ ' + esc(dev.permit_expiry) + '</div>'
+    + '<div class="tag">' + esc(dev.emp_id) + ' &middot; ' + esc(dev.device_id) + '</div>'
+    + '</div></div>';
+}
+
+function render(payload) {
+  var byId = {};
+  for (var i = 0; i < payload.employees.length; i++) {
+    byId[String(payload.employees[i].emp_id).trim()] = payload.employees[i];
+  }
+  /* พิมพ์เฉพาะเครื่องที่ยัง ACTIVE */
+  var devs = payload.devices.filter(function (d) { return String(d.status).toUpperCase() === 'ACTIVE'; });
+
+  var html = '', n = 0;
+  for (var j = 0; j < devs.length; j++) {
+    if (n % 8 === 0) html += (n ? '</div>' : '') + '<div class="page">';   // 8 ใบ / แผ่น A4
+    html += cardHTML(devs[j], byId[String(devs[j].emp_id).trim()] || {});
+    n++;
+  }
+  if (n) html += '</div>';
+  $('out').innerHTML = html || '<p style="padding:20px">ไม่มีเครื่องสถานะ ACTIVE ให้พิมพ์</p>';
+  $('msg').textContent = 'พร้อมพิมพ์ ' + n + ' ใบ (' + Math.ceil(n / 8) + ' แผ่น)';
+}
+
+$('btnLoad').onclick = function () {
+  $('msg').textContent = 'กำลังดึงข้อมูล...';
+  postSure({ action: 'login', guard_id: $('gid').value.trim().toUpperCase(), pin: $('pin').value.trim() }, 'devices')
+    .then(function (r) {
+      if (!r.ok) { $('msg').textContent = r.msg || 'เข้าสู่ระบบไม่สำเร็จ'; return; }
+      if (!r.devices) { $('msg').textContent = 'เซิร์ฟเวอร์ตอบไม่ครบ กดดึงข้อมูลอีกครั้ง'; return; }
+      render(r);
+    })['catch'](function () { $('msg').textContent = 'ต่อเซิร์ฟเวอร์ไม่ได้ หรือหมดเวลา 5 วินาที'; });
+};
+
+$('btnPrint').onclick = function () { window.print(); };
+</script>
+</body>
+</html>
