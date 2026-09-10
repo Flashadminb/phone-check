@@ -28,22 +28,36 @@ button{font-family:inherit;cursor:pointer;border:0}
 #err{color:#fca5a5;min-height:26px;margin-top:10px}
 #reader{width:100%;max-width:520px;margin:0 auto;border-radius:14px;overflow:hidden;background:#000}
 #reader video{width:100%!important;height:auto!important;display:block}
-#card{margin:12px auto;max-width:520px;border-radius:16px;padding:16px;background:#1e293b;border-left:12px solid #475569}
-#card.ok{background:#052e16;border-color:#22c55e}
-#card.no{background:#450a0a;border-color:#ef4444}
-#res{font-size:30px;font-weight:bold;margin-bottom:6px}
-#body{display:flex;gap:12px;align-items:flex-start}
-#info{min-width:0;flex:1}
-/* รูปพนักงาน: โหลดทีหลังเสมอ ไม่ขวางการแสดงผลการสแกน ไม่มีรูปก็ซ่อนไปเลย */
-#photo{width:88px;height:110px;flex:0 0 88px;object-fit:cover;border-radius:10px;
-       background:#334155;display:none}
-#name{font-size:26px;font-weight:bold}
-.row{font-size:17px;color:#cbd5e1;margin-top:3px}
-#acts{display:flex;gap:12px;max-width:520px;margin:0 auto}
-#acts button{flex:1;padding:26px 0;font-size:28px;font-weight:bold;border-radius:16px;color:#fff}
+#hint{max-width:520px;margin:12px auto;text-align:center;color:#94a3b8;font-size:16px}
+
+/* ---------- หน้าผลสแกน เต็มจอ ---------- */
+#result{position:fixed;inset:0;z-index:80;background:#0f172a;display:flex;flex-direction:column;
+        padding:14px;gap:12px;overflow:auto}
+#result.ok{background:#052e16}
+#result.no{background:#450a0a}
+#rres{font-size:40px;font-weight:bold;text-align:center;line-height:1.15;color:#fff}
+#rbody{display:flex;gap:14px;align-items:flex-start;flex:1;min-height:0}
+/* รูปพนักงาน โหลดเบื้องหลังเสมอ ไม่ขวางการแสดงผล ไม่มีรูปก็ซ่อนไป */
+#rphoto{width:38%;max-width:230px;aspect-ratio:3/4;object-fit:cover;border-radius:14px;
+        background:#334155;display:none;flex:0 0 auto}
+#rinfo{flex:1;min-width:0}
+#rname{font-size:34px;font-weight:bold;line-height:1.2;word-break:break-word}
+.rrow{font-size:20px;color:#e2e8f0;margin-top:6px;word-break:break-word}
+#racts{display:flex;gap:12px}
+#racts button{flex:1;padding:30px 0;font-size:32px;font-weight:bold;border-radius:18px;color:#fff}
 #bin{background:#16a34a}
 #bout{background:#dc2626}
-#acts button:disabled{background:#334155;color:#64748b}
+#rclose{background:transparent;color:#94a3b8;font-size:17px;padding:10px;text-decoration:underline}
+/* ตะแคงจอ = รูปใหญ่ขึ้น ปุ่มไปอยู่ขวา กดด้วยนิ้วโป้งได้ทั้งสองมือ */
+@media (orientation:landscape){
+  #result{flex-direction:row;flex-wrap:wrap;align-items:stretch}
+  #rres{width:100%;font-size:32px}
+  #rbody{flex:1 1 60%}
+  #rphoto{width:auto;height:100%;max-height:60vh;max-width:40%}
+  #racts{flex:0 0 30%;flex-direction:column;justify-content:center}
+  #racts button{padding:22px 0}
+  #rclose{width:100%}
+}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0ea5e9;color:#fff;
        padding:12px 20px;border-radius:10px;font-size:18px;z-index:99;opacity:0;transition:opacity .2s}
 #toast.show{opacity:1}
@@ -71,22 +85,7 @@ button{font-family:inherit;cursor:pointer;border:0}
 
   <section id="scan" class="hide">
     <div id="reader"></div>
-    <div id="card">
-      <div id="res">พร้อมสแกน</div>
-      <div id="body">
-        <img id="photo" alt="">
-        <div id="info">
-          <div id="name">หันกล้องไปที่บัตร QR</div>
-          <div class="row" id="d1"></div>
-          <div class="row" id="d2"></div>
-          <div class="row" id="d3"></div>
-        </div>
-      </div>
-    </div>
-    <div id="acts">
-      <button id="bin" disabled>เข้า</button>
-      <button id="bout" disabled>ออก</button>
-    </div>
+    <div id="hint">หันกล้องไปที่บัตร QR ระบบจะเด้งผลให้เอง</div>
     <div id="manual">
       <button class="mini" id="btnManual">พิมพ์รหัสเอง</button>
       <button class="mini" id="btnSync">sync</button>
@@ -97,6 +96,26 @@ button{font-family:inherit;cursor:pointer;border:0}
     </div>
   </section>
 </main>
+
+<!-- ============ หน้าผลสแกน เต็มจอ ============ -->
+<section id="result" class="hide">
+  <div id="rres">ผ่าน</div>
+  <div id="rbody">
+    <img id="rphoto" alt="">
+    <div id="rinfo">
+      <div id="rname">-</div>
+      <div class="rrow" id="rd1"></div>
+      <div class="rrow" id="rd2"></div>
+      <div class="rrow" id="rd3"></div>
+      <div class="rrow" id="rd4"></div>
+    </div>
+  </div>
+  <div id="racts">
+    <button id="bin">เข้า</button>
+    <button id="bout">ออก</button>
+  </div>
+  <button id="rclose">ปิด สแกนต่อ</button>
+</section>
 
 <div id="toast"></div>
 
@@ -124,7 +143,7 @@ try {
 var $ = function (id) { return document.getElementById(id); };
 
 var K_TOKEN = 'pc_token', K_GUARD = 'pc_guard', K_DB = 'pc_db', K_QUEUE = 'pc_queue';
-var S = { token: '', guard: null, db: null, queue: [], last: { t: '', ts: 0 }, cur: null, busy: false };
+var S = { token: '', guard: null, db: null, queue: [], last: { t: '', ts: 0 }, cur: null, busy: false, autoBack: 0 };
 
 function lsGet(k, def) {
   try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } catch (e) { return def; }
@@ -205,6 +224,8 @@ function tokenAlive(token) {
 function logout(reason) {
   S.token = '';
   localStorage.removeItem(K_TOKEN);
+  if (S.autoBack) { clearTimeout(S.autoBack); S.autoBack = 0; }
+  $('result').className = 'hide';
   stopScanner();
   $('scan').className = 'hide';
   $('bar').className = 'hide';
@@ -278,8 +299,6 @@ function flushQueue() {
   })['catch'](function () { S.busy = false; });
 }
 
-function setButtons(on) { $('bin').disabled = !on; $('bout').disabled = !on; }
-
 function tick(direction) {
   if (!S.cur) return;
   var g = {
@@ -297,9 +316,7 @@ function tick(direction) {
   updateBar();
   toast(direction === 'IN' ? 'บันทึก เข้า แล้ว' : 'บันทึก ออก แล้ว',
         direction === 'IN' ? '#16a34a' : '#dc2626');
-  setButtons(false);
-  S.cur = null;
-  S.last = { t: '', ts: 0 };
+  closeResult();     // ติ๊กเสร็จกลับไปหน้ากล้องทันที พร้อมสแกนคนถัดไป
   flushQueue();
 }
 
@@ -314,31 +331,44 @@ function photoUrl(u) {
   return u;
 }
 
+/* เปิดหน้าผลเต็มจอ ข้อความขึ้นทันที รูปตามมาทีหลัง */
 function showResult(r) {
-  $('card').className = r.ok ? 'ok' : 'no';
-  $('res').textContent = (r.ok ? '🟢 ผ่าน' : '🔴 ไม่ผ่าน') + ' - ' + r.msg;
   var emp = r.emp, dev = r.dev;
-  $('name').textContent = emp ? emp.name : (r.emp_id || '-');
-  $('d1').textContent = emp ? ('ซัพ: ' + emp.supplier + '  ' + emp.emp_id) : '';
-  $('d2').textContent = dev ? (dev.brand_model + ' / ' + dev.color + '  ' + dev.device_id) : '';
-  $('d3').textContent = dev ? ('IMEI ' + dev.imei + '  หมดอายุ ' + dev.permit_expiry) : '';
+  $('result').className = r.ok ? 'ok' : 'no';
+  $('rres').textContent = r.ok ? '🟢 ผ่าน' : '🔴 ' + r.msg;
+  $('rname').textContent = emp ? emp.name : (r.emp_id || '-');
+  $('rd1').textContent = emp ? (emp.supplier + '  ·  ' + emp.emp_id) : '';
+  $('rd2').textContent = dev ? (dev.brand_model + ' / ' + dev.color) : '';
+  $('rd3').textContent = dev ? ('IMEI ' + dev.imei) : '';
+  $('rd4').textContent = dev ? (dev.device_id + '  ·  หมดอายุ ' + dev.permit_expiry) : '';
 
-  /* ใส่รูปทีหลังสุด เบราว์เซอร์โหลดรูปเบื้องหลัง ข้อความจึงขึ้นทันทีเหมือนเดิม
-     รูปโหลดไม่ได้ (เน็ตล่ม/ลิงก์ผิด) ก็แค่ซ่อนช่องรูป ไม่มีค้าง ไม่มี error */
-  var ph = $('photo');
+  var ph = $('rphoto');
   var src = emp ? photoUrl(emp.photo_url) : '';
   ph.onerror = function () { ph.style.display = 'none'; };
   if (src) { ph.style.display = 'block'; ph.src = src; }
   else { ph.style.display = 'none'; ph.removeAttribute('src'); }
+
   /* สั่น: ผ่าน 1 จังหวะ ไม่ผ่าน 2 จังหวะ */
   if (navigator.vibrate) navigator.vibrate(r.ok ? [140] : [90, 90, 90]);
+
   S.cur = r;
-  setButtons(true);
+  // ไม่มีใครกดอะไรเลยภายใน 25 วินาที ให้กลับไปหน้ากล้องเอง กันหน้าค้าง
+  if (S.autoBack) clearTimeout(S.autoBack);
+  S.autoBack = setTimeout(closeResult, 25000);
+}
+
+/* ปิดหน้าผล กลับไปหน้ากล้อง */
+function closeResult() {
+  if (S.autoBack) { clearTimeout(S.autoBack); S.autoBack = 0; }
+  $('result').className = 'hide';
+  S.cur = null;
+  S.last = { t: '', ts: 0 };   // ปิดแล้วให้สแกนบัตรใบเดิมซ้ำได้ทันที
 }
 
 /* อ่าน QR ได้ -> ตรวจในเครื่องล้วน ๆ จึงเด้งผลทันที ไม่รอ network */
 function onScan(text) {
   var now = Date.now();
+  if ($('result').className !== 'hide') return;   // หน้าผลเปิดค้างอยู่ ไม่ต้องอ่านซ้ำ
   if (text === S.last.t && (now - S.last.ts) < 5000) return;
   S.last = { t: text, ts: now };
   showResult(verify(text, S.db, now));
@@ -388,6 +418,7 @@ function openScanner() {
   $('pin').onkeydown = function (e) { if (e.key === 'Enter') doLogin(); };
   $('bin').onclick = function () { tick('IN'); };
   $('bout').onclick = function () { tick('OUT'); };
+  $('rclose').onclick = closeResult;
   $('btnSync').onclick = function () { syncNow(false); };
   $('btnOut').onclick = function () { logout(''); };
   $('btnManual').onclick = function () {
