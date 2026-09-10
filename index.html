@@ -57,18 +57,11 @@ button{font-family:inherit;cursor:pointer;border:0}
 <main>
   <section id="login">
     <h1>ระบบตรวจมือถือ</h1>
-    <p>เข้าสู่ระบบด้วยรหัสยาม + PIN</p>
-    <input id="gid" placeholder="รหัสยาม เช่น G01" autocomplete="off" autocapitalize="characters">
+    <p>เข้าสู่ระบบด้วยรหัส + PIN</p>
+    <input id="gid" placeholder="รหัส เช่น G01" autocomplete="off" autocapitalize="characters">
     <input id="pin" placeholder="PIN 4 หลัก" inputmode="numeric" type="password" autocomplete="off">
     <button class="big" id="btnLogin">เข้าสู่ระบบ</button>
     <div id="err"></div>
-    <div id="mode"></div>
-    <button class="mini" id="btnCfg">ตั้งค่าเซิร์ฟเวอร์</button>
-    <div id="cfg" class="hide" style="margin-top:10px">
-      <input id="apiurl" placeholder="วาง URL ที่ลงท้ายด้วย /exec" style="font-size:15px">
-      <button class="big" id="btnSaveCfg">บันทึก URL</button>
-      <button class="mini" id="btnClearCfg">ล้างค่า กลับไปโหมดทดลอง</button>
-    </div>
   </section>
 
   <section id="scan" class="hide">
@@ -354,18 +347,6 @@ function openScanner() {
   startScanner();
 }
 
-/* บอกให้ชัดว่าตอนนี้ต่อกับข้อมูลจริงหรือข้อมูลปลอม */
-function showMode() {
-  var m = $('mode');
-  if (USE_MOCK) {
-    m.innerHTML = '<span style="color:#fbbf24">โหมดทดลอง ใช้ข้อมูลปลอม '
-      + '(ล็อกอิน G01 / PIN 1234)</span>';
-  } else {
-    m.innerHTML = '<span style="color:#4ade80">ต่อกับชีตจริงแล้ว</span>'
-      + '<div style="color:#64748b;font-size:13px;word-break:break-all">' + API_URL + '</div>';
-  }
-}
-
 (function init() {
   S.token = lsGet(K_TOKEN, '');
   S.guard = lsGet(K_GUARD, null);
@@ -388,24 +369,6 @@ function showMode() {
     if (e.key === 'Enter') { onScan($('mtext').value.trim()); $('mtext').value = ''; }
   };
 
-  /* ตั้งค่า URL เซิร์ฟเวอร์จากในหน้าจอ เก็บลงเครื่อง ไม่ต้องแก้ไฟล์ */
-  showMode();
-  $('apiurl').value = USE_MOCK ? '' : API_URL;
-  $('btnCfg').onclick = function () {
-    $('cfg').className = $('cfg').className === 'hide' ? '' : 'hide';
-  };
-  $('btnSaveCfg').onclick = function () {
-    var u = $('apiurl').value.trim();
-    if (u.indexOf('http') !== 0) { $('err').textContent = 'URL ต้องขึ้นต้นด้วย https'; return; }
-    lsSet('pc_api', u);
-    localStorage.removeItem(K_TOKEN); localStorage.removeItem(K_DB);
-    location.reload();
-  };
-  $('btnClearCfg').onclick = function () {
-    localStorage.removeItem('pc_api');
-    localStorage.removeItem(K_TOKEN); localStorage.removeItem(K_DB);
-    location.reload();
-  };
 
   window.addEventListener('online', function () { updateBar(); syncNow(true); flushQueue(); });
   window.addEventListener('offline', updateBar);
