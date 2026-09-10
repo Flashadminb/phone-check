@@ -168,31 +168,42 @@ function withTimeout(p, ms) {
   });
 }
 
-function apiGet(params) {
-  if (USE_MOCK) return withTimeout(MockAPI.get(params), 5000);
+/* Apps Script ที่ไม่ถูกเรียกนาน ๆ จะ "หลับ" ครั้งแรกที่ปลุกอาจใช้เวลาถึง 20 วินาที
+   จึงให้เวลาต่างกันตามงาน: ล็อกอิน/sync รอได้นาน ส่ง log เบื้องหลังรอสั้น ๆ พอ */
+var T_LOGIN = 25000, T_SYNC = 20000, T_LOGS = 8000;
+
+function apiGet(params, ms) {
+  if (USE_MOCK) return withTimeout(MockAPI.get(params), ms || T_SYNC);
   var q = [];
   for (var k in params) q.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
-  return withTimeout(fetch(API_URL + '?' + q.join('&')).then(function (r) { return r.json(); }), 5000);
+  return withTimeout(fetch(API_URL + '?' + q.join('&')).then(function (r) { return r.json(); }), ms || T_SYNC);
 }
 
-function apiPost(body) {
-  if (USE_MOCK) return withTimeout(MockAPI.post(body), 5000);
+function apiPost(body, ms) {
+  if (USE_MOCK) return withTimeout(MockAPI.post(body), ms || T_SYNC);
   /* ใช้ content-type text/plain เพื่อเลี่ยง preflight เพราะ Apps Script ไม่ตอบ OPTIONS */
   return withTimeout(fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(body)
-  }).then(function (r) { return r.json(); }), 5000);
+  }).then(function (r) { return r.json(); }), ms || T_SYNC);
+}
+
+/* ปลุกเซิร์ฟเวอร์ล่วงหน้าตั้งแต่เปิดหน้าล็อกอิน ระหว่างยามกำลังพิมพ์ PIN
+   พอกดเข้าสู่ระบบจริง เซิร์ฟเวอร์ตื่นแล้ว = เร็วขึ้นหลายวินาที */
+function warmUp() {
+  if (USE_MOCK) return;
+  try { fetch(API_URL + '?action=ping'); } catch (e) {}
 }
 
 /* Apps Script มีอาการ POST หลุดกลายเป็น GET เป็นบางครั้ง (redirect 302 แล้ว body หาย)
    สังเกตได้จากคำตอบไม่มีฟิลด์ที่ควรมี เช่น login ต้องมี token / logs ต้องมี saved
    กรณีนี้ให้ยิงซ้ำ — ปลอดภัยเพราะฝั่งเซิร์ฟเวอร์กันซ้ำด้วย log_id อยู่แล้ว */
-function apiPostSure(body, expectKey, tries) {
+function apiPostSure(body, expectKey, tries, ms) {
   if (tries === undefined) tries = 3;
-  return apiPost(body).then(function (r) {
+  return apiPost(body, ms).then(function (r) {
     if (r && r.ok && r[expectKey] === undefined && tries > 1) {
-      return apiPostSure(body, expectKey, tries - 1);
+      return apiPostSure(body, expectKey, tries - 1, ms);
     }
     return r;
   });
@@ -240,18 +251,23 @@ function doLogin() {
   var gid = $('gid').value.trim().toUpperCase(), pin = $('pin').value.trim();
   if (!gid || !pin) { $('err').textContent = 'กรอกรหัสยามและ PIN ให้ครบ'; return; }
   $('err').textContent = 'กำลังเข้าสู่ระบบ...';
-  apiPostSure({ action: 'login', guard_id: gid, pin: pin }, 'token').then(function (r) {
+  $('btnLogin').disabled = true;
+  apiPostSure({ action: 'login', guard_id: gid, pin: pin }, 'token', 2, T_LOGIN).then(function (r) {
+    $('btnLogin').disabled = false;
     if (!r.ok) { $('err').textContent = r.msg || 'เข้าสู่ระบบไม่สำเร็จ'; return; }
     if (!r.token) { $('err').textContent = 'เซิร์ฟเวอร์ตอบไม่ครบ กดเข้าสู่ระบบอีกครั้ง'; return; }
     S.token = r.token; S.guard = r.guard;
     lsSet(K_TOKEN, r.token); lsSet(K_GUARD, r.guard);
-    saveDB(r);
+    if (r.employees) saveDB(r);          // เผื่อเซิร์ฟเวอร์เวอร์ชันเก่าที่ส่งข้อมูลมาพร้อมกัน
     $('pin').value = '';
     $('err').textContent = '';
-    openScanner();
+    openScanner();                        // เข้าหน้ากล้องทันที ไม่ต้องรอโหลดข้อมูล
+    if (!S.db) $('hint').textContent = 'กำลังโหลดข้อมูลพนักงาน รอสักครู่...';
+    syncNow(true);                        // ดึงข้อมูลเบื้องหลัง
   })['catch'](function (e) {
+    $('btnLogin').disabled = false;
     $('err').textContent = (e && e.message === 'TIMEOUT')
-      ? 'เครือข่ายช้าหรือไม่มีสัญญาณ ลองใหม่อีกครั้ง' : 'ต่อเซิร์ฟเวอร์ไม่ได้';
+      ? 'เซิร์ฟเวอร์ไม่ตอบ ลองกดเข้าสู่ระบบอีกครั้ง' : 'ต่อเซิร์ฟเวอร์ไม่ได้';
   });
 }
 
@@ -273,6 +289,7 @@ function syncNow(silent) {
     if (r.guard) { S.guard = r.guard; lsSet(K_GUARD, r.guard); }
     saveDB(r);
     updateBar();
+    $('hint').textContent = 'หันกล้องไปที่บัตร QR ระบบจะเด้งผลให้เอง';
     if (!silent) toast('อัปเดตข้อมูลแล้ว');
   })['catch'](function () { if (!silent) toast('sync ไม่สำเร็จ (ออฟไลน์)', '#b45309'); });
 }
@@ -283,7 +300,7 @@ function flushQueue() {
   if (!tokenAlive(S.token)) { logout('token หมดอายุ กรุณาเข้าสู่ระบบใหม่'); return; }
   S.busy = true;
   var batch = S.queue.slice(0, 50);
-  apiPostSure({ action: 'logs', token: S.token, logs: batch }, 'saved').then(function (r) {
+  apiPostSure({ action: 'logs', token: S.token, logs: batch }, 'saved', 2, T_LOGS).then(function (r) {
     S.busy = false;
     if (!r.ok) { if (r.err === 'TOKEN') logout('token หมดอายุ กรุณาเข้าสู่ระบบใหม่'); return; }
     if (!r.saved) return;   // คำตอบไม่ครบ เก็บไว้ในคิวแล้วส่งใหม่รอบหน้า (เซิร์ฟเวอร์กันซ้ำอยู่แล้ว)
@@ -436,10 +453,13 @@ function openScanner() {
   setInterval(flushQueue, 30 * 1000);
 
   /* มี token ที่ยังไม่หมดอายุ + มีข้อมูลในเครื่อง = เข้าหน้าสแกนได้เลย แม้ออฟไลน์ */
-  if (S.token && tokenAlive(S.token) && S.db) {
+  if (S.token && tokenAlive(S.token)) {
     openScanner();
+    if (!S.db) $('hint').textContent = 'กำลังโหลดข้อมูลพนักงาน รอสักครู่...';
     syncNow(true);
     flushQueue();
+  } else {
+    warmUp();   // ยังไม่ได้ล็อกอิน ปลุกเซิร์ฟเวอร์รอไว้ตั้งแต่ตอนนี้
   }
 
   if ('serviceWorker' in navigator) {

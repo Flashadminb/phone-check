@@ -73,12 +73,12 @@ function withTimeout(p, ms) {
 }
 
 function post(body) {
-  if (USE_MOCK) return withTimeout(MockAPI.post(body), 5000);
+  if (USE_MOCK) return withTimeout(MockAPI.post(body), 25000);
   return withTimeout(fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(body)
-  }).then(function (r) { return r.json(); }), 5000);
+  }).then(function (r) { return r.json(); }), 25000);
 }
 
 /* Apps Script บางครั้ง POST หลุดเป็น GET ทำให้คำตอบไม่มีข้อมูล — ยิงซ้ำได้ ไม่มีผลข้างเคียง */
@@ -134,12 +134,21 @@ function render(payload) {
 
 $('btnLoad').onclick = function () {
   $('msg').textContent = 'กำลังดึงข้อมูล...';
-  postSure({ action: 'login', guard_id: $('gid').value.trim().toUpperCase(), pin: $('pin').value.trim() }, 'devices')
+  /* ล็อกอินเอา token ก่อน (เร็ว) แล้วค่อยดึงข้อมูลด้วย action=sync */
+  postSure({ action: 'login', guard_id: $('gid').value.trim().toUpperCase(), pin: $('pin').value.trim() }, 'token')
     .then(function (r) {
-      if (!r.ok) { $('msg').textContent = r.msg || 'เข้าสู่ระบบไม่สำเร็จ'; return; }
-      if (!r.devices) { $('msg').textContent = 'เซิร์ฟเวอร์ตอบไม่ครบ กดดึงข้อมูลอีกครั้ง'; return; }
-      render(r);
-    })['catch'](function () { $('msg').textContent = 'ต่อเซิร์ฟเวอร์ไม่ได้ หรือหมดเวลา 5 วินาที'; });
+      if (!r.ok) { $('msg').textContent = r.msg || 'เข้าสู่ระบบไม่สำเร็จ'; return null; }
+      if (!r.token) { $('msg').textContent = 'เซิร์ฟเวอร์ตอบไม่ครบ กดดึงข้อมูลอีกครั้ง'; return null; }
+      if (USE_MOCK) return MockAPI.get({ action: 'sync', token: r.token });
+      return withTimeout(
+        fetch(API_URL + '?action=sync&token=' + encodeURIComponent(r.token))
+          .then(function (x) { return x.json(); }), 25000);
+    })
+    .then(function (d) {
+      if (!d) return;
+      if (!d.ok || !d.devices) { $('msg').textContent = 'ดึงข้อมูลไม่สำเร็จ ลองอีกครั้ง'; return; }
+      render(d);
+    })['catch'](function () { $('msg').textContent = 'ต่อเซิร์ฟเวอร์ไม่ได้ หรือเซิร์ฟเวอร์ไม่ตอบ'; });
 };
 
 $('btnPrint').onclick = function () { window.print(); };
