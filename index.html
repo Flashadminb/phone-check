@@ -32,6 +32,11 @@ button{font-family:inherit;cursor:pointer;border:0}
 #card.ok{background:#052e16;border-color:#22c55e}
 #card.no{background:#450a0a;border-color:#ef4444}
 #res{font-size:30px;font-weight:bold;margin-bottom:6px}
+#body{display:flex;gap:12px;align-items:flex-start}
+#info{min-width:0;flex:1}
+/* รูปพนักงาน: โหลดทีหลังเสมอ ไม่ขวางการแสดงผลการสแกน ไม่มีรูปก็ซ่อนไปเลย */
+#photo{width:88px;height:110px;flex:0 0 88px;object-fit:cover;border-radius:10px;
+       background:#334155;display:none}
 #name{font-size:26px;font-weight:bold}
 .row{font-size:17px;color:#cbd5e1;margin-top:3px}
 #acts{display:flex;gap:12px;max-width:520px;margin:0 auto}
@@ -68,10 +73,15 @@ button{font-family:inherit;cursor:pointer;border:0}
     <div id="reader"></div>
     <div id="card">
       <div id="res">พร้อมสแกน</div>
-      <div id="name">หันกล้องไปที่บัตร QR</div>
-      <div class="row" id="d1"></div>
-      <div class="row" id="d2"></div>
-      <div class="row" id="d3"></div>
+      <div id="body">
+        <img id="photo" alt="">
+        <div id="info">
+          <div id="name">หันกล้องไปที่บัตร QR</div>
+          <div class="row" id="d1"></div>
+          <div class="row" id="d2"></div>
+          <div class="row" id="d3"></div>
+        </div>
+      </div>
     </div>
     <div id="acts">
       <button id="bin" disabled>เข้า</button>
@@ -293,6 +303,17 @@ function tick(direction) {
   flushQueue();
 }
 
+/* รับลิงก์รูปได้ทุกแบบ ถ้าเป็นลิงก์แชร์ของ Google Drive จะแปลงเป็นลิงก์รูปย่อ 200px ให้เอง
+   (รูปย่อโหลดเร็วกว่าไฟล์เต็มมาก และไม่ต้องตั้งค่าอะไรเพิ่ม) */
+function photoUrl(u) {
+  u = String(u || '').trim();
+  if (!u) return '';
+  var m = u.match(/drive\.google\.com\/file\/d\/([^\/?#]+)/);
+  if (!m) m = u.match(/[?&]id=([^&]+)/);
+  if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w200';
+  return u;
+}
+
 function showResult(r) {
   $('card').className = r.ok ? 'ok' : 'no';
   $('res').textContent = (r.ok ? '🟢 ผ่าน' : '🔴 ไม่ผ่าน') + ' - ' + r.msg;
@@ -301,6 +322,14 @@ function showResult(r) {
   $('d1').textContent = emp ? ('ซัพ: ' + emp.supplier + '  ' + emp.emp_id) : '';
   $('d2').textContent = dev ? (dev.brand_model + ' / ' + dev.color + '  ' + dev.device_id) : '';
   $('d3').textContent = dev ? ('IMEI ' + dev.imei + '  หมดอายุ ' + dev.permit_expiry) : '';
+
+  /* ใส่รูปทีหลังสุด เบราว์เซอร์โหลดรูปเบื้องหลัง ข้อความจึงขึ้นทันทีเหมือนเดิม
+     รูปโหลดไม่ได้ (เน็ตล่ม/ลิงก์ผิด) ก็แค่ซ่อนช่องรูป ไม่มีค้าง ไม่มี error */
+  var ph = $('photo');
+  var src = emp ? photoUrl(emp.photo_url) : '';
+  ph.onerror = function () { ph.style.display = 'none'; };
+  if (src) { ph.style.display = 'block'; ph.src = src; }
+  else { ph.style.display = 'none'; ph.removeAttribute('src'); }
   /* สั่น: ผ่าน 1 จังหวะ ไม่ผ่าน 2 จังหวะ */
   if (navigator.vibrate) navigator.vibrate(r.ok ? [140] : [90, 90, 90]);
   S.cur = r;
