@@ -2,7 +2,7 @@
  * Service Worker — ทำให้แอปเปิดได้ 100% ตอนออฟไลน์
  * กติกา: ข้าม request ที่ไปหา script.google.com เสมอ (ข้อมูลสด ห้ามแคช)
  */
-var CACHE = 'phonecheck-v4';   /*** ⚠️ แก้ตรงนี้ ***/ /* เปลี่ยนเลขเวอร์ชันทุกครั้งที่แก้ไฟล์ใน web/ */
+var CACHE = 'phonecheck-v5';   /*** ⚠️ แก้ตรงนี้ ***/ /* เปลี่ยนเลขเวอร์ชันทุกครั้งที่แก้ไฟล์ใน web/ */
 
 var SHELL = [
   './',
@@ -43,7 +43,43 @@ self.addEventListener('fetch', function (e) {
   if (url.indexOf('script.google.com') !== -1 || url.indexOf('googleusercontent.com') !== -1) return;
   if (e.request.method !== 'GET') return;
 
-  // cache first: เปิดเร็วและใช้ได้แม้ไม่มีสัญญาณ แล้วค่อยอัปเดตแคชเบื้องหลัง
+  // หน้าเว็บและสคริปต์ของแอป: เอาของใหม่จากเน็ตก่อนเสมอ (จะได้ไม่ต้องปิด-เปิดแอปหลายรอบ)
+  // ถ้าเน็ตล่ม/ช้าเกิน 3 วินาที ค่อยใช้ของที่แคชไว้ → ออฟไลน์ยังใช้ได้เหมือนเดิม
+  var isApp = e.request.mode === 'navigate' ||
+              /\.(html|js|json)$/.test(new URL(url).pathname);
+
+  if (isApp) {
+    e.respondWith(
+      new Promise(function (resolve) {
+        var done = false;
+        var fallback = setTimeout(function () {
+          if (done) return;
+          caches.match(e.request).then(function (hit) {
+            if (hit && !done) { done = true; resolve(hit); }
+          });
+        }, 3000);
+
+        fetch(e.request).then(function (res) {
+          if (done) return;
+          done = true; clearTimeout(fallback);
+          if (res && res.status === 200) {
+            var copy = res.clone();
+            caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+          }
+          resolve(res);
+        })['catch'](function () {
+          if (done) return;
+          done = true; clearTimeout(fallback);
+          caches.match(e.request).then(function (hit) {
+            resolve(hit || new Response('offline', { status: 503 }));
+          });
+        });
+      })
+    );
+    return;
+  }
+
+  // ไฟล์อื่น (รูป ฟอนต์ ไลบรารี): cache first เพื่อความเร็ว แล้วอัปเดตเบื้องหลัง
   e.respondWith(
     caches.match(e.request, { ignoreSearch: false }).then(function (hit) {
       var net = fetch(e.request).then(function (res) {
